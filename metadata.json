@@ -1,0 +1,6 @@
+{
+  "name": "ตำแหน่งทางวิชาการ มศก.",
+  "description": "ระบบคู่มือและข้อมูลตำแหน่งทางวิชาการ กองทรัพยากรมนุษย์ มหาวิทยาลัยศิลปากร (Minimal & Responsive Web App)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
