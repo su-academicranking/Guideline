@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { SliderItem, formatGoogleDriveImageUrl } from '../types';
-import { ChevronLeft, ChevronRight, Award, FileText, GraduationCap, Eye, Sparkles, ArrowUpRight, BookOpen } from 'lucide-react';
+import { SliderItem, formatGoogleDriveImageUrl, getGoogleDriveImageCandidates } from '../types';
+import { ChevronLeft, ChevronRight, Sparkles, ArrowUpRight } from 'lucide-react';
 
 interface HeroSliderProps {
   heroTitle: string;
@@ -35,14 +35,18 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Extract valid image URLs from Google Sheet slider data
-  const validImages = sliderItems
+  // Extract raw image URLs from Google Sheet slider data
+  const rawUrls = sliderItems
     .map(s => {
       if (!s) return '';
-      if (typeof s === 'string') return formatGoogleDriveImageUrl(s);
-      const raw = s.ImageURL || (s as any).URL || (s as any).Image || (s as any).Photo || (s as any).Link || (s as any).Url || (s as any).image || (s as any)[''] || '';
-      return formatGoogleDriveImageUrl(raw);
+      if (typeof s === 'string') return s;
+      return s.ImageURL || (s as any).URL || (s as any).Image || (s as any).Photo || (s as any).Link || (s as any).Url || (s as any).image || (s as any)[''] || '';
     })
+    .filter(url => url && typeof url === 'string' && url.trim().length > 0);
+
+  // Convert raw URLs to candidate image URLs (lh3 Google Drive or raw URL)
+  const validImages = rawUrls
+    .map(url => formatGoogleDriveImageUrl(url))
     .filter(url => url && typeof url === 'string' && url.startsWith('http'));
 
   // Merge Google Sheet images with fallbacks if needed so we always have at least 3 distinct photos
@@ -62,6 +66,34 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
   const img1 = displayImages[currentIndex % displayImages.length];
   const img2 = displayImages[(currentIndex + 1) % displayImages.length];
   const img3 = displayImages[(currentIndex + 2) % displayImages.length];
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, fallbackIndex: number) => {
+    const target = e.target as HTMLImageElement;
+    const currentSrc = target.src;
+    
+    // If it was lh3 Google Drive URL, try thumbnail fallback next
+    if (currentSrc.includes('lh3.googleusercontent.com/d/')) {
+      const fileId = currentSrc.split('/d/')[1]?.split('?')[0];
+      if (fileId) {
+        target.src = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+        return;
+      }
+    }
+    
+    // If thumbnail fails, try Google Drive uc export view
+    if (currentSrc.includes('drive.google.com/thumbnail')) {
+      const match = currentSrc.match(/id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        target.src = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+        return;
+      }
+    }
+
+    // Final fallback to high-quality unsplash image
+    if (!target.src.includes('unsplash.com')) {
+      target.src = FALLBACK_IMAGES[fallbackIndex % FALLBACK_IMAGES.length];
+    }
+  };
 
   return (
     <section className="relative bg-[#FAF9FE] pt-8 sm:pt-14 pb-12 sm:pb-16 overflow-hidden border-b border-slate-200/60">
@@ -116,12 +148,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                       alt="Academic Portrait 1"
                       className="w-full h-full object-cover object-top"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        if (!target.src.includes('unsplash.com')) {
-                          target.src = FALLBACK_IMAGES[0];
-                        }
-                      }}
+                      onError={(e) => handleImageError(e, 0)}
                     />
                   </AnimatePresence>
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-transparent pointer-events-none"></div>
@@ -151,12 +178,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                       alt="Academic Portrait 2"
                       className="w-full h-full object-cover object-top"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        if (!target.src.includes('unsplash.com')) {
-                          target.src = FALLBACK_IMAGES[1];
-                        }
-                      }}
+                      onError={(e) => handleImageError(e, 1)}
                     />
                   </AnimatePresence>
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-transparent pointer-events-none"></div>
@@ -188,12 +210,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                       alt="Academic Photo 3"
                       className="w-full h-full object-cover object-center"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        if (!target.src.includes('unsplash.com')) {
-                          target.src = FALLBACK_IMAGES[2];
-                        }
-                      }}
+                      onError={(e) => handleImageError(e, 2)}
                     />
                   </AnimatePresence>
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-transparent pointer-events-none"></div>
@@ -226,7 +243,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                       key={idx}
                       onClick={() => setCurrentIndex(idx)}
                       className={`h-2 rounded-full transition-all cursor-pointer ${
-                        idx === currentIndex ? 'w-6 bg-violet-600' : 'w-2 bg-slate-300 hover:bg-slate-400'
+                        idx === currentIndex ? 'w-6 bg-emerald-700' : 'w-2 bg-slate-300 hover:bg-slate-400'
                       }`}
                       title={`สไลด์ที่ ${idx + 1}`}
                     />
@@ -236,14 +253,14 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => setCurrentIndex(prev => (prev - 1 + displayImages.length) % displayImages.length)}
-                    className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-violet-600 hover:text-white transition-colors cursor-pointer shadow-xs"
+                    className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-700 hover:text-white transition-colors cursor-pointer shadow-xs"
                     title="ภาพก่อนหน้า"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setCurrentIndex(prev => (prev + 1) % displayImages.length)}
-                    className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-violet-600 hover:text-white transition-colors cursor-pointer shadow-xs"
+                    className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-700 hover:text-white transition-colors cursor-pointer shadow-xs"
                     title="ภาพถัดไป"
                   >
                     <ChevronRight className="w-4 h-4" />
@@ -259,3 +276,4 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
     </section>
   );
 };
+

@@ -113,7 +113,6 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Header Right Actions & Side Menu Trigger */}
             <div className="flex items-center space-x-2">
-              
               {/* Quick Bookmark button if has items */}
               {bookmarksCount > 0 && (
                 <button

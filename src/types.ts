@@ -44,27 +44,31 @@ export interface KnowledgeItem {
   [key: string]: any;
 }
 
+export function getGoogleDriveImageCandidates(rawUrl: string): string[] {
+  if (!rawUrl || typeof rawUrl !== 'string') return [];
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return [];
+
+  const match1 = trimmed.match(/(?:drive|docs)\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  const match2 = trimmed.match(/(?:drive|docs)\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+  const match3 = trimmed.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  const fileId = (match1 && match1[1]) || (match2 && match2[1]) || (match3 && match3[1]);
+
+  if (fileId) {
+    return [
+      `https://lh3.googleusercontent.com/d/${fileId}`,
+      `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`,
+      `https://drive.google.com/uc?export=view&id=${fileId}`
+    ];
+  }
+
+  return [trimmed];
+}
+
 export function formatGoogleDriveImageUrl(rawUrl: string): string {
   if (!rawUrl || typeof rawUrl !== 'string') return '';
-  const trimmed = rawUrl.trim();
-  if (!trimmed) return '';
-  try {
-    const match1 = trimmed.match(/(?:drive|docs)\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (match1 && match1[1]) {
-      return `https://lh3.googleusercontent.com/d/${match1[1]}`;
-    }
-    const match2 = trimmed.match(/(?:drive|docs)\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
-    if (match2 && match2[1]) {
-      return `https://lh3.googleusercontent.com/d/${match2[1]}`;
-    }
-    const match3 = trimmed.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
-    if (match3 && match3[1]) {
-      return `https://lh3.googleusercontent.com/d/${match3[1]}`;
-    }
-  } catch {
-    // fallback to original url
-  }
-  return trimmed;
+  const candidates = getGoogleDriveImageCandidates(rawUrl);
+  return candidates[0] || rawUrl;
 }
 
 export function extractFileLink(item: any): string | null {
