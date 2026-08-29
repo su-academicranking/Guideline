@@ -23,76 +23,96 @@ async function fetchFromAppsScript() {
   }
 
   const text = await res.text();
-  const initPrefix = "goog.script.init(";
-  const initIdx = text.indexOf(initPrefix);
-  if (initIdx === -1) {
-    throw new Error("Could not find goog.script.init in Apps Script response");
+  const trimmed = text.trim();
+  let parsedData: any = null;
+
+  // 1. Direct JSON Response
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const jsonObj = JSON.parse(trimmed);
+      if (jsonObj.data) {
+        parsedData = jsonObj.data;
+      } else if (jsonObj.settings || jsonObj.items || jsonObj.categories || jsonObj.slider) {
+        parsedData = jsonObj;
+      }
+    } catch {
+      // Continue to HTML extraction if JSON parse fails
+    }
   }
 
-  const startQuote = text.indexOf("\"", initIdx);
-  let endQuote = text.indexOf("\", \"\", undefined", startQuote);
-  if (endQuote === -1) {
-    endQuote = text.indexOf("\",\"\",undefined", startQuote);
-  }
-  if (endQuote === -1) {
-    endQuote = text.indexOf("\", \"\",", startQuote);
-  }
+  // 2. Extract from goog.script.init inside HTML
+  if (!parsedData) {
+    const initPrefix = "goog.script.init(";
+    const initIdx = text.indexOf(initPrefix);
+    if (initIdx !== -1) {
+      const startQuote = text.indexOf("\"", initIdx);
+      let endQuote = text.indexOf("\", \"\", undefined", startQuote);
+      if (endQuote === -1) endQuote = text.indexOf("\",\"\",undefined", startQuote);
+      if (endQuote === -1) endQuote = text.indexOf("\", \"\",", startQuote);
 
-  if (startQuote === -1 || endQuote === -1) {
-    throw new Error("Could not find quote boundaries in Apps Script response");
-  }
+      if (startQuote !== -1 && endQuote !== -1) {
+        const rawArg = text.slice(startQuote, endQuote + 1);
+        const jsonArg = rawArg.replace(/\\x([0-9A-Fa-f]{2})/g, "\\u00$1");
+        const innerJsonStr = JSON.parse(jsonArg);
+        const initObj = JSON.parse(innerJsonStr);
+        const userHtml = initObj.userHtml;
 
-  const rawArg = text.slice(startQuote, endQuote + 1);
-  const jsonArg = rawArg.replace(/\\x([0-9A-Fa-f]{2})/g, "\\u00$1");
-
-  const innerJsonStr = JSON.parse(jsonArg);
-  const initObj = JSON.parse(innerJsonStr);
-  const userHtml = initObj.userHtml;
-
-  if (!userHtml) {
-    throw new Error("userHtml property not found in initObj");
-  }
-
-  const match = userHtml.match(/<script id="initial-data" type="application\/json">([\s\S]*?)<\/script>/);
-  if (!match) {
-    throw new Error("initial-data script tag not found in userHtml");
+        if (userHtml) {
+          const match = userHtml.match(/<script id="initial-data" type="application\/json">([\s\S]*?)<\/script>/);
+          if (match && match[1]) {
+            parsedData = JSON.parse(match[1]);
+          }
+        }
+      }
+    }
   }
 
-  const parsedData = JSON.parse(match[1]);
+  // 3. Fallback: Search directly for initial-data script tag
+  if (!parsedData) {
+    const match = text.match(/<script id="initial-data" type="application\/json">([\s\S]*?)<\/script>/);
+    if (match && match[1]) {
+      parsedData = JSON.parse(match[1]);
+    }
+  }
+
+  if (!parsedData) {
+    throw new Error("Unable to parse response from Apps Script");
+  }
+
   parsedData.lastUpdated = new Date().toISOString();
 
-  // Sanitize totalVisits and thisMonthVisits (guard against timestamp values from Google Apps Script)
-  if (parsedData.totalVisits && parsedData.totalVisits > 1000000) {
-    const monthCount = typeof parsedData.thisMonthVisits === 'number' && parsedData.thisMonthVisits < 100000 
-      ? parsedData.thisMonthVisits 
-      : 118;
-    parsedData.totalVisits = monthCount + 166;
-  }
-  if (!parsedData.thisMonthVisits || parsedData.thisMonthVisits > 100000) {
-    parsedData.thisMonthVisits = 118;
-  }
+  // Helper for Google Drive image conversion
+  const formatDriveUrl = (raw: string) => {
+    if (!raw || typeof raw !== 'string') return '';
+    const clean = raw.trim();
+    const match1 = clean.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (match1 && match1[1]) return `https://lh3.googleusercontent.com/d/${match1[1]}`;
+    const match2 = clean.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+    if (match2 && match2[1]) return `https://lh3.googleusercontent.com/d/${match2[1]}`;
+    return clean;
+  };
+
+  // Sanitize totalVisits and thisMonthVisits
+  const rawTotal = typeof parsedData.totalVisits === 'number' ? parsedData.totalVisits : 284;
+  const rawMonth = typeof parsedData.thisMonthVisits === 'number' ? parsedData.thisMonthVisits : 118;
+  const monthCount = (rawMonth > 0 && rawMonth < 100000) ? rawMonth : 118;
+  const totalCount = (rawTotal > 0 && rawTotal < 1000000) ? rawTotal : monthCount + 166;
+  
+  parsedData.totalVisits = totalCount;
+  parsedData.thisMonthVisits = monthCount;
 
   // Normalize slider items and clean image URLs
   if (Array.isArray(parsedData.slider)) {
     parsedData.slider = parsedData.slider.map((item: any) => {
-      let rawUrl = item.ImageURL || item.URL || item.Image || item.Photo || item[''] || '';
-      if (typeof rawUrl === 'string') {
-        rawUrl = rawUrl.trim();
-        const driveFileMatch = rawUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (driveFileMatch && driveFileMatch[1]) {
-          rawUrl = `https://lh3.googleusercontent.com/d/${driveFileMatch[1]}`;
-        } else {
-          const driveIdMatch = rawUrl.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
-          if (driveIdMatch && driveIdMatch[1]) {
-            rawUrl = `https://lh3.googleusercontent.com/d/${driveIdMatch[1]}`;
-          }
-        }
+      if (typeof item === 'string') {
+        return { ImageURL: formatDriveUrl(item) };
       }
+      const rawUrl = item.ImageURL || item.URL || item.Image || item.Photo || item.Link || item.image || item.url || item[''] || '';
       return {
         ...item,
-        ImageURL: rawUrl
+        ImageURL: formatDriveUrl(rawUrl) || rawUrl
       };
-    }).filter((item: any) => item.ImageURL && item.ImageURL.startsWith('http'));
+    }).filter((item: any) => item.ImageURL && typeof item.ImageURL === 'string' && item.ImageURL.startsWith('http'));
   }
 
   return parsedData;

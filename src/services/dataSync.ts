@@ -92,7 +92,10 @@ export function sanitizeAppData(rawData: any): AppsScriptData {
   // 2. Normalize Slider Images
   if (Array.isArray(data.slider)) {
     data.slider = data.slider.map((item: any) => {
-      const rawUrl = item.ImageURL || item.URL || item.Image || item.Photo || item[''] || '';
+      if (typeof item === 'string') {
+        return { ImageURL: formatGoogleDriveImageUrl(item) };
+      }
+      const rawUrl = item.ImageURL || item.URL || item.Image || item.Photo || item.Link || item.Url || item.image || item.url || item[''] || '';
       return {
         ...item,
         ImageURL: formatGoogleDriveImageUrl(rawUrl) || rawUrl

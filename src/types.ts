@@ -49,13 +49,17 @@ export function formatGoogleDriveImageUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
   if (!trimmed) return '';
   try {
-    const match1 = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    const match1 = trimmed.match(/(?:drive|docs)\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
     if (match1 && match1[1]) {
       return `https://lh3.googleusercontent.com/d/${match1[1]}`;
     }
-    const match2 = trimmed.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+    const match2 = trimmed.match(/(?:drive|docs)\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
     if (match2 && match2[1]) {
       return `https://lh3.googleusercontent.com/d/${match2[1]}`;
+    }
+    const match3 = trimmed.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+    if (match3 && match3[1]) {
+      return `https://lh3.googleusercontent.com/d/${match3[1]}`;
     }
   } catch {
     // fallback to original url

@@ -37,7 +37,12 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
 
   // Extract valid image URLs from Google Sheet slider data
   const validImages = sliderItems
-    .map(s => formatGoogleDriveImageUrl(s.ImageURL))
+    .map(s => {
+      if (!s) return '';
+      if (typeof s === 'string') return formatGoogleDriveImageUrl(s);
+      const raw = s.ImageURL || (s as any).URL || (s as any).Image || (s as any).Photo || (s as any).Link || (s as any).Url || (s as any).image || (s as any)[''] || '';
+      return formatGoogleDriveImageUrl(raw);
+    })
     .filter(url => url && typeof url === 'string' && url.startsWith('http'));
 
   // Merge Google Sheet images with fallbacks if needed so we always have at least 3 distinct photos
@@ -45,12 +50,12 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
     ? validImages 
     : [...validImages, ...FALLBACK_IMAGES.slice(validImages.length)];
 
-  // Auto-advance slider every 5 seconds if multiple images exist
+  // Auto-advance slider every 4 seconds if multiple images exist
   useEffect(() => {
     if (displayImages.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex(prev => (prev + 1) % displayImages.length);
-    }, 5000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [displayImages.length]);
 
@@ -104,6 +109,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                     <motion.img
                       key={img1}
                       src={img1}
+                      referrerPolicy="no-referrer"
                       initial={{ opacity: 0, scale: 1.08 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
@@ -111,7 +117,10 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                       alt="Academic Portrait 1"
                       className="w-full h-full object-cover object-top"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = FALLBACK_IMAGES[0];
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.includes('unsplash.com')) {
+                          target.src = FALLBACK_IMAGES[0];
+                        }
                       }}
                     />
                   </AnimatePresence>
@@ -135,6 +144,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                     <motion.img
                       key={img2}
                       src={img2}
+                      referrerPolicy="no-referrer"
                       initial={{ opacity: 0, scale: 1.08 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
@@ -142,7 +152,10 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                       alt="Academic Portrait 2"
                       className="w-full h-full object-cover object-top"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = FALLBACK_IMAGES[1];
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.includes('unsplash.com')) {
+                          target.src = FALLBACK_IMAGES[1];
+                        }
                       }}
                     />
                   </AnimatePresence>
@@ -168,6 +181,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                     <motion.img
                       key={img3}
                       src={img3}
+                      referrerPolicy="no-referrer"
                       initial={{ opacity: 0, scale: 1.08 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
@@ -175,7 +189,10 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                       alt="Academic Photo 3"
                       className="w-full h-full object-cover object-center"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = FALLBACK_IMAGES[2];
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.includes('unsplash.com')) {
+                          target.src = FALLBACK_IMAGES[2];
+                        }
                       }}
                     />
                   </AnimatePresence>
