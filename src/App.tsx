@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AppsScriptData, KnowledgeItem, FormItem } from './types';
 import { INITIAL_APP_DATA } from './data/initialData';
+import { fetchLiveAppData, getStoredAppData, APPS_SCRIPT_URL } from './services/dataSync';
 import { Header } from './components/Header';
 import { HeroSlider } from './components/HeroSlider';
 import { KnowledgeBase } from './components/KnowledgeBase';
@@ -134,7 +135,7 @@ export default function App() {
   // Google Apps Script Web App URL connected to Google Sheets
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxLHp1LBXBj4QYgIUq76-fie06_DscaOCbGcirvk1b44fOVyoFmVBungMUTx7ZRua8obg/exec";
 
-  // Fetch API & Sync Real-Time Stats with Google Sheet
+  // Fetch API & Sync Real-Time Stats with Google Sheet (Supports both Fullstack Server and Static GitHub Pages)
   const fetchData = useCallback(async (forceRefresh = false) => {
     if (forceRefresh) setIsRefreshing(true);
     setError(null);
@@ -148,39 +149,19 @@ export default function App() {
     } catch {}
 
     try {
-      // 2. Try fetching from Express backend if running in fullstack mode
-      const endpoint = forceRefresh ? '/api/data?refresh=1' : '/api/data';
-      const res = await fetch(endpoint, {
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          const raw = json.data;
-          const monthCount = (raw.thisMonthVisits && raw.thisMonthVisits < 100000) ? raw.thisMonthVisits : 118;
-          const totalCount = (raw.totalVisits && raw.totalVisits < 1000000) ? raw.totalVisits : monthCount + 166;
-          const sanitized = {
-            ...raw,
-            totalVisits: totalCount,
-            thisMonthVisits: monthCount
-          };
-          setData(sanitized);
-          try {
-            localStorage.setItem('su_hr_cached_data', JSON.stringify(sanitized));
-          } catch {}
-          return;
-        }
+      // 2. Fetch live data across all available endpoints (Express server, Direct Google Apps Script, CORS proxies)
+      const latestData = await fetchLiveAppData(forceRefresh);
+      if (latestData) {
+        setData(latestData);
       }
-    } catch {
-      // Running on Static GitHub Pages mode
+    } catch (err) {
+      console.warn("Could not sync live data from Google Sheet, using cached/initial data", err);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
 
-    // 2. Fallback for Static GitHub Pages: Count session visit reasonably
+    // 3. Fallback for Static GitHub Pages: Count session visit reasonably
     try {
       const hasCountedSession = sessionStorage.getItem('su_hr_visit_recorded');
       if (!hasCountedSession) {
