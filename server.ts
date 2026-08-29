@@ -5,10 +5,10 @@ import { createServer as createViteServer } from "vite";
 const app = express();
 const PORT = 3000;
 
-// In-memory cache for fast response times
+// Short in-memory cache to prevent spamming but allow fast updates
 let cachedData: any = null;
 let lastCacheTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+const CACHE_TTL = 10 * 1000; // 10 seconds cache for near real-time updates
 
 async function fetchFromAppsScript() {
   const url = "https://script.google.com/macros/s/AKfycbxLHp1LBXBj4QYgIUq76-fie06_DscaOCbGcirvk1b44fOVyoFmVBungMUTx7ZRua8obg/exec";

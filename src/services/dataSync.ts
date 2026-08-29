@@ -189,14 +189,22 @@ export async function fetchLiveAppData(forceRefresh = false): Promise<AppsScript
 
   // Strategy 3: CORS Proxy Fallbacks (Specifically for GitHub Pages static environment)
   const proxyEndpoints = [
-    `https://corsproxy.io/?${encodeURIComponent(APPS_SCRIPT_URL + '?t=' + timestamp)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(APPS_SCRIPT_URL + '?t=' + timestamp)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(APPS_SCRIPT_URL + '?t=' + timestamp)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(APPS_SCRIPT_URL + '?t=' + timestamp)}`
+    `https://corsproxy.io/?${encodeURIComponent(APPS_SCRIPT_URL + '?t=' + timestamp)}`
   ];
 
   for (const proxyUrl of proxyEndpoints) {
     try {
-      const proxyRes = await fetch(proxyUrl, { cache: 'no-store' });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      
+      const proxyRes = await fetch(proxyUrl, { 
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
       if (proxyRes.ok) {
         const text = await proxyRes.text();
         const parsed = parseAppsScriptResponse(text);
