@@ -21,6 +21,7 @@ async function fetchSheetTabGViz(sheetId: string, tabName: string, signal?: Abor
   if (!match) throw new Error(`Invalid GViz response format for tab ${tabName}`);
   
   const json = JSON.parse(match[1]);
+  if (json.status === "error") return [];
   const cols = json.table?.cols || [];
   const rawRows = json.table?.rows || [];
   if (rawRows.length === 0) return [];
@@ -39,7 +40,17 @@ async function fetchSheetTabGViz(sheetId: string, tabName: string, signal?: Abor
     headers.forEach((h: string, colIdx: number) => {
       if (!h) return;
       const cell = r.c ? r.c[colIdx] : null;
-      obj[h] = cell ? (cell.v !== undefined ? cell.v : cell.f) : "";
+      let val = cell ? (cell.v !== undefined ? cell.v : cell.f) : "";
+      if (typeof val === "string" && val.startsWith("Date(")) {
+        const dMatch = val.match(/Date\((\d+),(\d+),(\d+)\)/);
+        if (dMatch) {
+          const year = dMatch[1];
+          const month = String(Number(dMatch[2]) + 1).padStart(2, "0");
+          const day = String(dMatch[3]).padStart(2, "0");
+          val = `${year}-${month}-${day}`;
+        }
+      }
+      obj[h] = val;
     });
     return obj;
   });
@@ -51,32 +62,63 @@ async function fetchSheetTabGViz(sheetId: string, tabName: string, signal?: Abor
  */
 export async function fetchDirectFromGoogleSheet(sheetId = GOOGLE_SHEET_ID): Promise<AppsScriptData> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const [settingsRows, categoriesRows, sliderRows, formCatsRows, formsRows, contactRows] = await Promise.all([
+    const [
+      settingsRows,
+      categoriesRows,
+      dataRows,
+      itemsRows,
+      sliderRows,
+      formCatsRows,
+      formsRows,
+      contactRows,
+      branchesRows
+    ] = await Promise.all([
       fetchSheetTabGViz(sheetId, "Settings", controller.signal).catch(() => []),
       fetchSheetTabGViz(sheetId, "Categories", controller.signal).catch(() => []),
+      fetchSheetTabGViz(sheetId, "Data", controller.signal).catch(() => []),
+      fetchSheetTabGViz(sheetId, "Items", controller.signal).catch(() => []),
       fetchSheetTabGViz(sheetId, "Slider", controller.signal).catch(() => []),
       fetchSheetTabGViz(sheetId, "FormCategories", controller.signal).catch(() => []),
       fetchSheetTabGViz(sheetId, "Forms", controller.signal).catch(() => []),
-      fetchSheetTabGViz(sheetId, "Contact", controller.signal).catch(() => [])
+      fetchSheetTabGViz(sheetId, "Contact", controller.signal).catch(() => []),
+      fetchSheetTabGViz(sheetId, "Branches", controller.signal).catch(() => [])
     ]);
 
     clearTimeout(timeoutId);
 
     const settings = settingsRows.length > 0 ? settingsRows[0] : INITIAL_APP_DATA.settings;
     
-    // Extract categories
+    // 1. Extract and normalize Knowledge Items (Q&A and Circulars)
+    const rawKnowledgeRows = dataRows.length > 0 ? dataRows : itemsRows;
+    const items = rawKnowledgeRows.map((r: any, idx: number) => ({
+      rowNum: r.rowNum || idx + 2,
+      Category: r.Category || r.Group || "Q&A",
+      Title: r.Title || r.Question || r.Topic || r.Name || "",
+      Details: r.Details || r.Answer || r.Description || r.Detail || "",
+      Date: r.Date || "",
+      FileURL: r.Link || r.FileURL || r.URL || r.LinkURL || r.File || "",
+      Link: r.Link || r.FileURL || r.URL || "",
+      ImageURL: r.ImageURL ? formatGoogleDriveImageUrl(r.ImageURL) : ""
+    })).filter((item: any) => item.Title && item.Title.trim().length > 0 && item.Title !== "Title");
+
+    // 2. Extract and normalize Categories
     let categories = categoriesRows
       .map((c: any) => c.Name || c.A || Object.values(c)[1])
-      .filter((c: any) => typeof c === 'string' && c.trim().length > 0);
+      .filter((c: any) => typeof c === 'string' && c.trim().length > 0 && c !== "Name");
     
+    // If categories is empty or incomplete, infer from items
+    const inferredCategories = Array.from(new Set(items.map((i: any) => i.Category).filter(Boolean)));
+    inferredCategories.forEach((cat: any) => {
+      if (!categories.includes(cat)) categories.push(cat);
+    });
     if (categories.length === 0) {
       categories = INITIAL_APP_DATA.categories;
     }
 
-    // Map forms to FormItem[]
+    // 3. Map forms to FormItem[]
     const formsData: any[] = formsRows.map((row: any) => ({
       ...row,
       Level1: row.Level1 || row.Category || "การประเมินการสอน",
@@ -84,19 +126,28 @@ export async function fetchDirectFromGoogleSheet(sheetId = GOOGLE_SHEET_ID): Pro
       Level3: row.Level3 || "",
       Title: row.Title || row.Name || "",
       FileURL: row.LinkURL || row.FileURL || row.URL || row.Link || ""
-    }));
+    })).filter((f: any) => f.Title && f.Title !== "Title");
+
+    // 4. Map Academic Branches
+    const branches = branchesRows.map((r: any, idx: number) => ({
+      rowNum: r.rowNum || idx + 2,
+      Group: r.Group || r.A || "",
+      Field: r.Field || r.B || "",
+      Subfield: r.Subfield || r.C || "",
+      Branch: r.Branch || r.D || ""
+    })).filter((b: any) => b.Group && b.Group !== "Group" && b.Group.trim() !== "");
 
     const contact = contactRows.length > 0 ? contactRows[0] : INITIAL_APP_DATA.contact;
 
     const result: AppsScriptData = {
       settings,
       categories,
-      items: [],
+      items: items.length > 0 ? items : INITIAL_APP_DATA.items,
       slider: sliderRows,
       formCatsMeta: formCatsRows,
       formsData: formsData.length > 0 ? formsData : INITIAL_APP_DATA.formsData,
       contact,
-      branches: INITIAL_APP_DATA.branches,
+      branches: branches.length > 0 ? branches : INITIAL_APP_DATA.branches,
       branchConfigs: INITIAL_APP_DATA.branchConfigs,
       totalVisits: 284,
       thisMonthVisits: 118,
