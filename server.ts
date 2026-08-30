@@ -55,6 +55,64 @@ async function fetchTabGViz(tabName: string): Promise<any[]> {
   });
 }
 
+function parseVisitsFromStatsRows(statsRows: any[]): { totalVisits: number; thisMonthVisits: number } {
+  if (!Array.isArray(statsRows) || statsRows.length === 0) {
+    return { totalVisits: 0, thisMonthVisits: 0 };
+  }
+
+  let monthlySum = 0;
+  let currentMonthCount = 0;
+  let explicitTotal = 0;
+  let explicitThisMonth = 0;
+  let latestMonthCount = 0;
+
+  const now = new Date();
+  const currentMM = String(now.getMonth() + 1).padStart(2, "0");
+  const currentYYYY = String(now.getFullYear());
+  const currentBE = String(now.getFullYear() + 543);
+
+  const currentMonthKeys = [
+    `${currentMM}-${currentYYYY}`,
+    `${currentYYYY}-${currentMM}`,
+    `${currentMM}/${currentYYYY}`,
+    `${currentYYYY}/${currentMM}`,
+    `${currentMM}-${currentBE}`,
+    `${currentBE}-${currentMM}`,
+    `${currentMM}/${currentBE}`,
+    `${currentBE}/${currentMM}`,
+  ];
+
+  statsRows.forEach((row) => {
+    const key = String(row.Month_Year || row.Month || row.A || row.Date || Object.values(row)[1] || Object.values(row)[0] || "").trim();
+    const valRaw = row.Count !== undefined ? row.Count : (row.Visits !== undefined ? row.Visits : (row.B !== undefined ? row.B : Object.values(row)[2]));
+    const val = typeof valRaw === "number" ? valRaw : parseInt(String(valRaw).replace(/,/g, ""), 10);
+
+    const lowerKey = key.toLowerCase();
+
+    if (lowerKey === "totalvisits" || lowerKey === "total" || key === "จำนวนผู้เข้าชมทั้งหมด") {
+      if (!isNaN(val) && val > 0) explicitTotal = val;
+    } else if (lowerKey === "thismonthvisits" || lowerKey === "thismonth" || lowerKey === "month" || key === "จำนวนผู้เข้าชมในเดือนนี้") {
+      if (!isNaN(val) && val > 0) explicitThisMonth = val;
+    } else if (key && !["lastmonth", "lastupdated", "timestamp", "datetime"].includes(lowerKey)) {
+      if (!isNaN(val) && val >= 0) {
+        monthlySum += val;
+        latestMonthCount = val;
+
+        const isCurrentMonth = currentMonthKeys.some((k) => key.includes(k)) || 
+          (key.includes(currentMM) && (key.includes(currentYYYY) || key.includes(currentBE)));
+        if (isCurrentMonth) {
+          currentMonthCount = val;
+        }
+      }
+    }
+  });
+
+  const totalVisits = monthlySum > 0 ? (explicitTotal > monthlySum ? explicitTotal : monthlySum) : (explicitTotal || 0);
+  const thisMonthVisits = currentMonthCount > 0 ? currentMonthCount : (explicitThisMonth > 0 ? explicitThisMonth : latestMonthCount);
+
+  return { totalVisits, thisMonthVisits };
+}
+
 async function fetchFromGoogleSheet(): Promise<any> {
   const [
     settingsRows,
@@ -65,7 +123,8 @@ async function fetchFromGoogleSheet(): Promise<any> {
     formCatsRows,
     formsRows,
     contactRows,
-    branchesRows
+    branchesRows,
+    statsRows
   ] = await Promise.all([
     fetchTabGViz("Settings").catch(() => []),
     fetchTabGViz("Categories").catch(() => []),
@@ -75,7 +134,8 @@ async function fetchFromGoogleSheet(): Promise<any> {
     fetchTabGViz("FormCategories").catch(() => []),
     fetchTabGViz("Forms").catch(() => []),
     fetchTabGViz("Contact").catch(() => []),
-    fetchTabGViz("Branches").catch(() => [])
+    fetchTabGViz("Branches").catch(() => []),
+    fetchTabGViz("Stats").catch(() => [])
   ]);
 
   const rawKnowledgeRows = dataRows.length > 0 ? dataRows : itemsRows;
@@ -116,6 +176,8 @@ async function fetchFromGoogleSheet(): Promise<any> {
     Branch: r.Branch || r.D || ""
   })).filter((b: any) => b.Group && b.Group !== "Group" && b.Group.trim() !== "");
 
+  const parsedVisits = parseVisitsFromStatsRows(statsRows);
+
   return {
     settings: settingsRows[0] || {},
     categories,
@@ -125,8 +187,8 @@ async function fetchFromGoogleSheet(): Promise<any> {
     formsData,
     contact: contactRows[0] || {},
     branches,
-    totalVisits: 284,
-    thisMonthVisits: 118,
+    totalVisits: parsedVisits.totalVisits,
+    thisMonthVisits: parsedVisits.thisMonthVisits,
     lastUpdated: new Date().toISOString()
   };
 }
@@ -224,13 +286,11 @@ async function fetchFromAppsScript() {
   };
 
   // Sanitize totalVisits and thisMonthVisits
-  const rawTotal = typeof parsedData.totalVisits === 'number' ? parsedData.totalVisits : 284;
-  const rawMonth = typeof parsedData.thisMonthVisits === 'number' ? parsedData.thisMonthVisits : 118;
-  const monthCount = (rawMonth > 0 && rawMonth < 100000) ? rawMonth : 118;
-  const totalCount = (rawTotal > 0 && rawTotal < 1000000) ? rawTotal : monthCount + 166;
+  const rawTotal = typeof parsedData.totalVisits === 'number' ? parsedData.totalVisits : 0;
+  const rawMonth = typeof parsedData.thisMonthVisits === 'number' ? parsedData.thisMonthVisits : 0;
   
-  parsedData.totalVisits = totalCount;
-  parsedData.thisMonthVisits = monthCount;
+  parsedData.totalVisits = rawTotal;
+  parsedData.thisMonthVisits = rawMonth;
 
   // Normalize slider items and clean image URLs
   if (Array.isArray(parsedData.slider)) {

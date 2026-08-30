@@ -56,6 +56,66 @@ async function fetchSheetTabGViz(sheetId: string, tabName: string, signal?: Abor
   });
 }
 
+export function parseVisitsFromStatsTab(statsRows: any[]): { totalVisits: number; thisMonthVisits: number } {
+  if (!Array.isArray(statsRows) || statsRows.length === 0) {
+    return { totalVisits: 0, thisMonthVisits: 0 };
+  }
+
+  let monthlySum = 0;
+  let currentMonthCount = 0;
+  let explicitTotal = 0;
+  let explicitThisMonth = 0;
+  let latestMonthCount = 0;
+
+  const now = new Date();
+  const currentMM = String(now.getMonth() + 1).padStart(2, '0');
+  const currentYYYY = String(now.getFullYear());
+  const currentBE = String(now.getFullYear() + 543);
+
+  const currentMonthKeys = [
+    `${currentMM}-${currentYYYY}`, // 08-2026
+    `${currentYYYY}-${currentMM}`, // 2026-08
+    `${currentMM}/${currentYYYY}`, // 08/2026
+    `${currentYYYY}/${currentMM}`, // 2026/08
+    `${currentMM}-${currentBE}`,   // 08-2569
+    `${currentBE}-${currentMM}`,   // 2569-08
+    `${currentMM}/${currentBE}`,   // 08/2569
+    `${currentBE}/${currentMM}`,   // 2569/08
+  ];
+
+  statsRows.forEach((row) => {
+    // Column 1 is Month/Year or Special Metric Name
+    const key = String(row.Month_Year || row.Month || row.A || row.Date || Object.values(row)[1] || Object.values(row)[0] || '').trim();
+    // Column 2 is Count / Visits
+    const valRaw = row.Count !== undefined ? row.Count : (row.Visits !== undefined ? row.Visits : (row.B !== undefined ? row.B : Object.values(row)[2]));
+    const val = typeof valRaw === 'number' ? valRaw : parseInt(String(valRaw).replace(/,/g, ''), 10);
+
+    const lowerKey = key.toLowerCase();
+
+    if (lowerKey === 'totalvisits' || lowerKey === 'total' || key === 'จำนวนผู้เข้าชมทั้งหมด') {
+      if (!isNaN(val) && val > 0) explicitTotal = val;
+    } else if (lowerKey === 'thismonthvisits' || lowerKey === 'thismonth' || lowerKey === 'month' || key === 'จำนวนผู้เข้าชมในเดือนนี้') {
+      if (!isNaN(val) && val > 0) explicitThisMonth = val;
+    } else if (key && !['lastmonth', 'lastupdated', 'timestamp', 'datetime'].includes(lowerKey)) {
+      if (!isNaN(val) && val >= 0) {
+        monthlySum += val;
+        latestMonthCount = val;
+
+        const isCurrentMonth = currentMonthKeys.some((k) => key.includes(k)) || 
+          (key.includes(currentMM) && (key.includes(currentYYYY) || key.includes(currentBE)));
+        if (isCurrentMonth) {
+          currentMonthCount = val;
+        }
+      }
+    }
+  });
+
+  const totalVisits = monthlySum > 0 ? (explicitTotal > monthlySum ? explicitTotal : monthlySum) : (explicitTotal || 0);
+  const thisMonthVisits = currentMonthCount > 0 ? currentMonthCount : (explicitThisMonth > 0 ? explicitThisMonth : latestMonthCount);
+
+  return { totalVisits, thisMonthVisits };
+}
+
 /**
  * Fetches all tabs directly from Google Sheet and constructs AppsScriptData object.
  * Perfect for GitHub Pages and static deployments.
@@ -74,7 +134,8 @@ export async function fetchDirectFromGoogleSheet(sheetId = GOOGLE_SHEET_ID): Pro
       formCatsRows,
       formsRows,
       contactRows,
-      branchesRows
+      branchesRows,
+      statsRows
     ] = await Promise.all([
       fetchSheetTabGViz(sheetId, "Settings", controller.signal).catch(() => []),
       fetchSheetTabGViz(sheetId, "Categories", controller.signal).catch(() => []),
@@ -84,7 +145,8 @@ export async function fetchDirectFromGoogleSheet(sheetId = GOOGLE_SHEET_ID): Pro
       fetchSheetTabGViz(sheetId, "FormCategories", controller.signal).catch(() => []),
       fetchSheetTabGViz(sheetId, "Forms", controller.signal).catch(() => []),
       fetchSheetTabGViz(sheetId, "Contact", controller.signal).catch(() => []),
-      fetchSheetTabGViz(sheetId, "Branches", controller.signal).catch(() => [])
+      fetchSheetTabGViz(sheetId, "Branches", controller.signal).catch(() => []),
+      fetchSheetTabGViz(sheetId, "Stats", controller.signal).catch(() => [])
     ]);
 
     clearTimeout(timeoutId);
@@ -139,6 +201,9 @@ export async function fetchDirectFromGoogleSheet(sheetId = GOOGLE_SHEET_ID): Pro
 
     const contact = contactRows.length > 0 ? contactRows[0] : INITIAL_APP_DATA.contact;
 
+    // 5. Parse Visitor Statistics from Stats tab
+    const parsedVisits = parseVisitsFromStatsTab(statsRows);
+
     const result: AppsScriptData = {
       settings,
       categories,
@@ -149,8 +214,8 @@ export async function fetchDirectFromGoogleSheet(sheetId = GOOGLE_SHEET_ID): Pro
       contact,
       branches: branches.length > 0 ? branches : INITIAL_APP_DATA.branches,
       branchConfigs: INITIAL_APP_DATA.branchConfigs,
-      totalVisits: 284,
-      thisMonthVisits: 118,
+      totalVisits: parsedVisits.totalVisits > 0 ? parsedVisits.totalVisits : INITIAL_APP_DATA.totalVisits,
+      thisMonthVisits: parsedVisits.thisMonthVisits > 0 ? parsedVisits.thisMonthVisits : INITIAL_APP_DATA.thisMonthVisits,
       lastUpdated: new Date().toISOString()
     };
 
@@ -213,7 +278,7 @@ export function parseAppsScriptResponse(text: string): AppsScriptData {
 /**
  * Normalizes and sanitizes the dataset:
  * - Fixes Google Drive URLs
- * - Sanitizes visitor count to prevent timestamp corruption
+ * - Sanitizes visitor count
  */
 export function sanitizeAppData(rawData: any): AppsScriptData {
   if (!rawData || typeof rawData !== 'object') {
@@ -234,14 +299,11 @@ export function sanitizeAppData(rawData: any): AppsScriptData {
   };
 
   // 1. Sanitize Visitor counts
-  const rawTotal = typeof rawData.totalVisits === 'number' ? rawData.totalVisits : 284;
-  const rawMonth = typeof rawData.thisMonthVisits === 'number' ? rawData.thisMonthVisits : 118;
+  const rawTotal = typeof rawData.totalVisits === 'number' ? rawData.totalVisits : 0;
+  const rawMonth = typeof rawData.thisMonthVisits === 'number' ? rawData.thisMonthVisits : 0;
   
-  const monthCount = (rawMonth > 0 && rawMonth < 100000) ? rawMonth : 118;
-  const totalCount = (rawTotal > 0 && rawTotal < 1000000) ? rawTotal : monthCount + 166;
-  
-  data.totalVisits = totalCount;
-  data.thisMonthVisits = monthCount;
+  data.totalVisits = rawTotal > 0 ? rawTotal : (INITIAL_APP_DATA.totalVisits || 0);
+  data.thisMonthVisits = rawMonth > 0 ? rawMonth : (INITIAL_APP_DATA.thisMonthVisits || 0);
   data.lastUpdated = new Date().toISOString();
 
   // 2. Normalize Slider Images

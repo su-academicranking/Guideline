@@ -169,9 +169,9 @@ export const ContactFooter: React.FC<ContactFooterProps> = ({
             <span className="font-prompt font-medium text-slate-700">สถิติผู้เข้าชมเว็บไซต์:</span>
           </div>
           <div className="flex items-center gap-3 font-sarabun">
-            <span>เข้าชมทั้งหมด <strong className="font-bold text-slate-800">{Number((totalVisits && totalVisits < 1000000) ? totalVisits : ((thisMonthVisits && thisMonthVisits < 100000 ? thisMonthVisits : 118) + 166)).toLocaleString('th-TH')}</strong> ครั้ง</span>
+            <span>เข้าชมทั้งหมด <strong className="font-bold text-slate-800">{Number(totalVisits || 0).toLocaleString('th-TH')}</strong> ครั้ง</span>
             <span className="text-slate-300">|</span>
-            <span>เดือนนี้ <strong className="font-bold text-slate-800">{Number((thisMonthVisits && thisMonthVisits < 100000) ? thisMonthVisits : 118).toLocaleString('th-TH')}</strong> ครั้ง</span>
+            <span>เดือนนี้ <strong className="font-bold text-slate-800">{Number(thisMonthVisits || 0).toLocaleString('th-TH')}</strong> ครั้ง</span>
           </div>
         </div>
 

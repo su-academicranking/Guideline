@@ -161,16 +161,15 @@ export default function App() {
       setIsRefreshing(false);
     }
 
-    // 3. Fallback for Static GitHub Pages: Count session visit reasonably
+    // 3. Track session visit for immediate UI response
     try {
       const hasCountedSession = sessionStorage.getItem('su_hr_visit_recorded');
       if (!hasCountedSession) {
         sessionStorage.setItem('su_hr_visit_recorded', '1');
         setData(prev => {
           if (!prev) return prev;
-          // Guard against corrupted timestamp values (e.g. > 1,000,000)
-          const baseTotal = (prev.totalVisits && prev.totalVisits < 1000000) ? prev.totalVisits : 284;
-          const baseMonth = (prev.thisMonthVisits && prev.thisMonthVisits < 100000) ? prev.thisMonthVisits : 118;
+          const baseTotal = typeof prev.totalVisits === 'number' ? prev.totalVisits : 0;
+          const baseMonth = typeof prev.thisMonthVisits === 'number' ? prev.thisMonthVisits : 0;
           const updated = {
             ...prev,
             totalVisits: baseTotal + 1,
