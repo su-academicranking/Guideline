@@ -98,6 +98,100 @@ export function extractFileLink(item: any): string | null {
   return null;
 }
 
+export function formatThaiFullDate(dateStr?: string): string {
+  if (!dateStr || typeof dateStr !== 'string') return '';
+  const trimmed = dateStr.trim();
+  if (!trimmed) return '';
+
+  const thaiMonths = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
+    'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
+    'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ];
+
+  // Try YYYY-MM-DD or YYYY/MM/DD
+  const matchYMD = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (matchYMD) {
+    const year = parseInt(matchYMD[1], 10);
+    const month = parseInt(matchYMD[2], 10) - 1;
+    const day = parseInt(matchYMD[3], 10);
+    if (month >= 0 && month <= 11) {
+      const thaiYear = year > 2400 ? year : year + 543;
+      return `${day} ${thaiMonths[month]} ${thaiYear}`;
+    }
+  }
+
+  // Try DD/MM/YYYY or DD-MM-YYYY
+  const matchDMY = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (matchDMY) {
+    const day = parseInt(matchDMY[1], 10);
+    const month = parseInt(matchDMY[2], 10) - 1;
+    const year = parseInt(matchDMY[3], 10);
+    if (month >= 0 && month <= 11) {
+      const thaiYear = year > 2400 ? year : year + 543;
+      return `${day} ${thaiMonths[month]} ${thaiYear}`;
+    }
+  }
+
+  // Try standard Date parsing
+  try {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      const day = d.getDate();
+      const month = d.getMonth();
+      const year = d.getFullYear();
+      const thaiYear = year > 2400 ? year : year + 543;
+      return `${day} ${thaiMonths[month]} ${thaiYear}`;
+    }
+  } catch {
+    // fallback to original string
+  }
+
+  return trimmed;
+}
+
+export function isNewItem(dateStr?: string, daysThreshold = 7): boolean {
+  if (!dateStr || typeof dateStr !== 'string') return false;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return false;
+
+  let targetDate: Date | null = null;
+
+  // Match YYYY-MM-DD or YYYY/MM/DD
+  const matchYMD = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (matchYMD) {
+    let year = parseInt(matchYMD[1], 10);
+    if (year > 2400) year -= 543; // Convert Thai Buddhist year to CE for Date calculation
+    const month = parseInt(matchYMD[2], 10) - 1;
+    const day = parseInt(matchYMD[3], 10);
+    targetDate = new Date(year, month, day);
+  } else {
+    const matchDMY = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (matchDMY) {
+      let year = parseInt(matchDMY[3], 10);
+      if (year > 2400) year -= 543;
+      const month = parseInt(matchDMY[2], 10) - 1;
+      const day = parseInt(matchDMY[1], 10);
+      targetDate = new Date(year, month, day);
+    } else {
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) {
+        targetDate = d;
+      }
+    }
+  }
+
+  if (!targetDate || isNaN(targetDate.getTime())) return false;
+
+  const now = new Date();
+  // Time difference in milliseconds
+  const diffMs = now.getTime() - targetDate.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  // If added in the future or within the past `daysThreshold` days, treat as NEW
+  return diffDays >= -1 && diffDays <= daysThreshold;
+}
+
 export interface FormItem {
   rowNum?: number;
   Level1: string;

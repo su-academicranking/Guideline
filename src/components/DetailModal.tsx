@@ -1,5 +1,5 @@
 import React from 'react';
-import { KnowledgeItem } from '../types';
+import { KnowledgeItem, formatThaiFullDate, isNewItem } from '../types';
 import { 
   X, 
   Tag, 
@@ -7,7 +7,8 @@ import {
   FileText,
   FileCheck,
   Paperclip,
-  ArrowUpRight
+  ArrowUpRight,
+  Sparkles
 } from 'lucide-react';
 
 interface DetailModalProps {
@@ -26,30 +27,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   // Extract link from potential Google Sheet keys
   const docLink = item.FileURL || item.FileLink || item.Link || item.PDFLink || item.URL || item.DocumentURL || item.AttachmentLink || item.Attachment;
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) {
-        const day = d.getDate();
-        const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-        const month = months[d.getMonth()];
-        const year = d.getFullYear() + 543;
-        return `${day} ${month} ${year}`;
-      }
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        const [y, m, d] = parts;
-        const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-        const mIdx = Math.max(0, Math.min(11, parseInt(m, 10) - 1));
-        return `${parseInt(d, 10)} ${months[mIdx]} ${Number(y) + 543}`;
-      }
-      return dateStr;
-    } catch {
-      return dateStr;
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
@@ -59,18 +36,28 @@ export const DetailModal: React.FC<DetailModalProps> = ({
         {/* White Header */}
         <div className="bg-white text-slate-900 p-4 sm:p-5 flex items-start justify-between border-b border-slate-200/80 relative">
           <div className="space-y-2 pr-6">
-            <span className="inline-flex items-center text-xs font-sarabun font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-3 py-1 rounded-full">
-              <Tag className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-              <span>{item.Category || 'หลักเกณฑ์'}</span>
-            </span>
-            <h3 className="text-base sm:text-xl font-bold font-prompt leading-snug text-slate-900">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center text-xs font-sarabun font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-3 py-1 rounded-full">
+                <Tag className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+                <span>{item.Category || 'หลักเกณฑ์'}</span>
+              </span>
+
+              {isNewItem(item.Date) && (
+                <span className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-xs font-bold font-sarabun bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-xs animate-pulse tracking-wide uppercase">
+                  <Sparkles className="w-3 h-3" />
+                  <span>NEW</span>
+                </span>
+              )}
+            </div>
+
+            <h3 className="text-base sm:text-xl font-bold font-sarabun leading-snug text-slate-900">
               {item.Title}
             </h3>
             
             {item.Date && (
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 pt-0.5 font-sarabun">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{formatDate(item.Date)}</span>
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600 pt-0.5 font-sarabun font-medium">
+                <Calendar className="w-4 h-4 text-emerald-600" />
+                <span>{formatThaiFullDate(item.Date)}</span>
               </div>
             )}
           </div>
@@ -108,7 +95,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 <div className="min-w-0">
                   <div className="text-xs font-bold font-sarabun text-emerald-950 flex items-center gap-1.5 flex-wrap">
                     <span>มีเอกสารแนบประกอบ / หนังสือเวียน</span>
-                    <span className="bg-emerald-200/80 text-emerald-800 text-[10px] px-2 py-0.2 rounded-full font-semibold">
+                    <span className="bg-emerald-700 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold shadow-xs">
                       ลิงก์ภายนอก
                     </span>
                   </div>

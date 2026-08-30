@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { KnowledgeItem, extractFileLink } from '../types';
+import { KnowledgeItem, extractFileLink, formatThaiFullDate, isNewItem } from '../types';
 import { 
   FileText, 
   Download, 
@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   ChevronDown,
   Filter,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 
 interface KnowledgeBaseProps {
@@ -193,9 +194,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     </span>
 
                     {item.Date && (
-                      <span className="text-[11px] text-slate-400 flex items-center gap-1 font-sarabun">
-                        <Calendar className="w-3 h-3" />
-                        <span>{formatDate(item.Date)}</span>
+                      <span className="text-[11px] sm:text-xs text-slate-500 flex items-center gap-1 font-sarabun font-medium">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{formatThaiFullDate(item.Date)}</span>
+                      </span>
+                    )}
+
+                    {isNewItem(item.Date) && (
+                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold font-sarabun bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-xs animate-pulse tracking-wide uppercase">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        <span>NEW</span>
                       </span>
                     )}
                   </div>
@@ -203,17 +211,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                   {/* Title in font-sarabun bold with color #2b3c56 */}
                   <h4 
                     onClick={() => onSelectItem(item)}
-                    className="text-sm sm:text-base font-bold font-sarabun text-[#2b3c56] hover:text-[#1a2638] transition-colors cursor-pointer leading-snug break-words"
+                    className="text-sm sm:text-base font-bold font-sarabun text-[#2b3c56] hover:text-emerald-700 transition-colors cursor-pointer leading-snug break-words"
                   >
                     {item.Title}
                   </h4>
-
-                  {/* Details preview */}
-                  {item.Details && (
-                    <p className="text-xs font-sarabun text-slate-600 line-clamp-2 leading-relaxed">
-                      {item.Details}
-                    </p>
-                  )}
                 </div>
 
                 {/* Action Buttons arranged neatly at same position */}
