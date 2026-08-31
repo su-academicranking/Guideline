@@ -192,6 +192,35 @@ export function isNewItem(dateStr?: string, daysThreshold = 7): boolean {
   return diffDays >= -1 && diffDays <= daysThreshold;
 }
 
+export function parseDateForSort(dateStr?: string): number {
+  if (!dateStr || typeof dateStr !== 'string') return 0;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return 0;
+
+  // Match YYYY-MM-DD or YYYY/MM/DD
+  const matchYMD = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (matchYMD) {
+    let year = parseInt(matchYMD[1], 10);
+    if (year > 2400) year -= 543;
+    const month = parseInt(matchYMD[2], 10) - 1;
+    const day = parseInt(matchYMD[3], 10);
+    return new Date(year, month, day).getTime() || 0;
+  }
+
+  // Match DD/MM/YYYY or DD-MM-YYYY
+  const matchDMY = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (matchDMY) {
+    let year = parseInt(matchDMY[3], 10);
+    if (year > 2400) year -= 543;
+    const month = parseInt(matchDMY[2], 10) - 1;
+    const day = parseInt(matchDMY[1], 10);
+    return new Date(year, month, day).getTime() || 0;
+  }
+
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
 export interface FormItem {
   rowNum?: number;
   Level1: string;
