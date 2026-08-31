@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { KnowledgeItem, extractFileLink, formatThaiFullDate, isNewItem, parseDateForSort } from '../types';
 import { 
   FileText, 
@@ -8,6 +8,7 @@ import {
   Tag, 
   HelpCircle, 
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   Filter,
   X,
@@ -37,6 +38,14 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState<string>('ทั้งหมด');
 
+  // Pagination states for Section 1 (Circular / Inquiries)
+  const [circularPage, setCircularPage] = useState<number>(1);
+  const [circularPageSize, setCircularPageSize] = useState<number>(5);
+
+  // Pagination states for Section 2 (Q&A)
+  const [qaPage, setQaPage] = useState<number>(1);
+  const [qaPageSize, setQaPageSize] = useState<number>(5);
+
   // 1. Sort all items from NEWEST to OLDEST by date
   const sortedAllItems = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -64,6 +73,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     });
   }, [sortedAllItems, activeCategory, searchQuery]);
 
+  // Reset pagination when search or category filter changes
+  useEffect(() => {
+    setCircularPage(1);
+    setQaPage(1);
+  }, [searchQuery, activeCategory]);
+
   // 3. Separate into 2 main sections:
   // Section 1: หนังสือเวียน / ตอบข้อหารือ
   const circularItems = useMemo(() => {
@@ -81,6 +96,20 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
       return !isCircular;
     });
   }, [filteredItems]);
+
+  // Paginated Items for Section 1
+  const circularTotalPages = Math.ceil(circularItems.length / circularPageSize) || 1;
+  const paginatedCircularItems = useMemo(() => {
+    const start = (circularPage - 1) * circularPageSize;
+    return circularItems.slice(start, start + circularPageSize);
+  }, [circularItems, circularPage, circularPageSize]);
+
+  // Paginated Items for Section 2
+  const qaTotalPages = Math.ceil(qaItems.length / qaPageSize) || 1;
+  const paginatedQaItems = useMemo(() => {
+    const start = (qaPage - 1) * qaPageSize;
+    return qaItems.slice(start, start + qaPageSize);
+  }, [qaItems, qaPage, qaPageSize]);
 
   // Render an individual Knowledge Item Card
   const renderItemCard = (item: KnowledgeItem, idx: number) => {
@@ -146,6 +175,104 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
           </button>
         </div>
 
+      </div>
+    );
+  };
+
+  // Reusable Section Pagination Component
+  const renderPagination = (
+    totalItems: number,
+    currentPage: number,
+    pageSize: number,
+    onPageChange: (p: number) => void,
+    onPageSizeChange: (s: number) => void,
+    accentColor: 'sky' | 'emerald'
+  ) => {
+    if (totalItems === 0) return null;
+
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+    const startIdx = (currentPage - 1) * pageSize + 1;
+    const endIdx = Math.min(currentPage * pageSize, totalItems);
+
+    const activeBg = accentColor === 'sky' 
+      ? 'bg-sky-700 text-white border-sky-700 shadow-2xs' 
+      : 'bg-emerald-700 text-white border-emerald-700 shadow-2xs';
+
+    const hoverText = accentColor === 'sky' 
+      ? 'hover:bg-sky-50 hover:text-sky-800 hover:border-sky-300' 
+      : 'hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300';
+
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-sarabun">
+        {/* Left: Item Range & Page Size Selector */}
+        <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
+          <span className="text-slate-600">
+            แสดง <strong className="font-bold text-slate-800">{startIdx}-{endIdx}</strong> จากทั้งหมด <strong className="font-bold text-slate-800">{totalItems}</strong> รายการ
+          </span>
+
+          <div className="flex items-center gap-1.5 text-slate-500 pl-2 sm:border-l border-slate-200">
+            <span>แสดงต่อหน้า:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                onPageSizeChange(Number(e.target.value));
+                onPageChange(1);
+              }}
+              className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Right: Page Buttons */}
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-colors"
+              title="หน้าก่อนหน้า"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+              .map((p, idx, arr) => {
+                const prev = arr[idx - 1];
+                const showEllipsis = prev && p - prev > 1;
+
+                return (
+                  <React.Fragment key={p}>
+                    {showEllipsis && <span className="px-1 text-slate-400">...</span>}
+                    <button
+                      onClick={() => onPageChange(p)}
+                      className={`min-w-[32px] h-8 px-2 rounded-lg font-bold transition-all cursor-pointer border ${
+                        currentPage === p
+                          ? activeBg
+                          : `bg-white text-slate-700 border-slate-200 ${hoverText}`
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+
+            <button
+              onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-colors"
+              title="หน้าถัดไป"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -253,14 +380,24 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
               </div>
 
               {/* Section 1 Items */}
-              {circularItems.length > 0 ? (
+              {paginatedCircularItems.length > 0 ? (
                 <div className="flex flex-col gap-2.5">
-                  {circularItems.map((item, idx) => renderItemCard(item, idx))}
+                  {paginatedCircularItems.map((item, idx) => renderItemCard(item, idx))}
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-400 text-xs font-sarabun">
                   ไม่พบรายการหนังสือเวียน/ตอบข้อหารือที่ตรงกับคำค้นหา
                 </div>
+              )}
+
+              {/* Section 1 Pagination */}
+              {circularItems.length > 0 && renderPagination(
+                circularItems.length,
+                circularPage,
+                circularPageSize,
+                setCircularPage,
+                setCircularPageSize,
+                'sky'
               )}
             </div>
           )}
@@ -271,8 +408,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
               {/* Section 2 Header */}
               <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 rounded-2xl p-4 sm:p-5 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-emerald-800/60">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-emerald-200 border border-white/20 flex-shrink-0">
-                    <MessageSquareText className="w-5 h-5 bg-white" />
+                  <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-white border border-white/20 flex-shrink-0">
+                    <MessageSquareText className="w-5 h-5 text-white" />
                   </div>
                   <div>
                     <h4 className="text-base sm:text-lg font-bold font-sarabun text-white">
@@ -287,14 +424,24 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
               </div>
 
               {/* Section 2 Items */}
-              {qaItems.length > 0 ? (
+              {paginatedQaItems.length > 0 ? (
                 <div className="flex flex-col gap-2.5">
-                  {qaItems.map((item, idx) => renderItemCard(item, idx))}
+                  {paginatedQaItems.map((item, idx) => renderItemCard(item, idx))}
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-400 text-xs font-sarabun">
                   ไม่พบข้อคำถาม Q&A ที่ตรงกับคำค้นหา
                 </div>
+              )}
+
+              {/* Section 2 Pagination */}
+              {qaItems.length > 0 && renderPagination(
+                qaItems.length,
+                qaPage,
+                qaPageSize,
+                setQaPage,
+                setQaPageSize,
+                'emerald'
               )}
             </div>
           )}
