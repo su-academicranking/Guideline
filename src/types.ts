@@ -26,12 +26,17 @@ export interface ContactInfo {
   Address?: string;
   AddressLink?: string;
   Phone?: string;
+  InternalPhone?: string;
+  PhoneInternal?: string;
+  Extension?: string;
+  Ext?: string;
   Email?: string;
   LineURL?: string;
   LineText?: string;
   FacebookURL?: string;
   FacebookText?: string;
   Copyright?: string;
+  [key: string]: any;
 }
 
 export interface KnowledgeItem {

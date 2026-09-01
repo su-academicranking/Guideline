@@ -1,7 +1,7 @@
 import React from 'react';
 import { ContactInfo, ExternalLink } from '../types';
 import { 
-  Building2, MapPin, Phone, Mail, Globe, Eye, 
+  Building2, MapPin, Phone, PhoneCall, Mail, Globe, Eye, 
   ExternalLink as ExternalLinkIcon
 } from 'lucide-react';
 
@@ -27,7 +27,7 @@ export const ContactFooter: React.FC<ContactFooterProps> = ({
   const currentYearBE = new Date().getFullYear() + 543;
 
   return (
-    <footer className="bg-white text-slate-700 pt-12 pb-8 border-t border-slate-200/80 mt-16 font-sarabun relative">
+    <footer id="contact-footer" className="bg-white text-slate-700 pt-12 pb-8 border-t border-slate-200/80 mt-16 font-sarabun relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         
         {/* Main Grid */}
@@ -87,6 +87,10 @@ export const ContactFooter: React.FC<ContactFooterProps> = ({
                     <span>โทรศัพท์: {contact.Phone}</span>
                   </div>
                 )}
+                <div className="flex items-center gap-2">
+                  <PhoneCall className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                  <span>เบอร์ภายใน: {contact?.InternalPhone || contact?.PhoneInternal || contact?.Extension || contact?.Ext || contact?.['เบอร์ภายใน'] || '100051 - 100076'}</span>
+                </div>
                 {contact?.Email && (
                   <div className="flex items-center gap-2">
                     <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />

@@ -16,7 +16,8 @@ import {
   X,
   CheckCircle2,
   ChevronRight,
-  Clock
+  Clock,
+  PhoneCall
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -63,6 +64,13 @@ const NAV_ITEMS = [
     label: 'สาขาวิชาที่ ก.พ.อ. กำหนด', 
     desc: 'สืบค้นรหัสกลุ่มและสาขาวิชาตามประกาศ ก.พ.อ.', 
     icon: GraduationCap,
+    color: 'emerald'
+  },
+  { 
+    id: 'contact', 
+    label: 'ติดต่อเรา', 
+    desc: 'ข้อมูลการติดต่อ กองทรัพยากรมนุษย์ และแผนที่', 
+    icon: PhoneCall,
     color: 'emerald'
   },
 ];
@@ -211,6 +219,29 @@ export const Header: React.FC<HeaderProps> = ({
                         <button
                           key={tab.id}
                           onClick={() => { 
+                            if (tab.id === 'contact') {
+                              setSideMenuOpen(false);
+                              if (activeTab !== 'home') {
+                                setActiveTab('home');
+                                setTimeout(() => {
+                                  const footerEl = document.getElementById('contact-footer');
+                                  if (footerEl) {
+                                    footerEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                  } else {
+                                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                                  }
+                                }, 150);
+                              } else {
+                                const footerEl = document.getElementById('contact-footer');
+                                if (footerEl) {
+                                  footerEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                } else {
+                                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                                }
+                              }
+                              return;
+                            }
+
                             setActiveTab(tab.id as any); 
                             setSideMenuOpen(false); 
                             window.scrollTo({ top: 0, behavior: 'smooth' });

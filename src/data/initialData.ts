@@ -39,6 +39,7 @@ export const INITIAL_APP_DATA: AppsScriptData = {
     "Address": "งานพัฒนาทรัพยากรมนุษย์ กองทรัพยากรมนุษย์ สำนักงานอธิการบดี (ตลิ่งชัน) มหาวิทยาลัยศิลปากร\n215 ถนนบรมราชชนนี แขวง/เขตตลิ่งชัน กรุงเทพมหานคร 10700",
     "AddressLink": "https://maps.app.goo.gl/dyKHQSPeZ6j6TNFo7",
     "Phone": "0 2849 7567",
+    "InternalPhone": "100051 - 100076",
     "Email": "personpd@su.ac.th",
     "LineURL": "https://lin.ee/qe5XCwv",
     "Copyright": "© 2026 Human Resources Division, Silpakorn University",
