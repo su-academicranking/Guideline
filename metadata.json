@@ -1,6 +1,6 @@
 {
   "name": "ตำแหน่งทางวิชาการ มศก.",
-  "description": "ระบบคู่มือและข้อมูลตำแหน่งทางวิชาการ กองทรัพยากรมนุษย์ มหาวิทยาลัยศิลปากร (Minimal & Responsive Web App)",
+  "description": "รวมหลักเกณฑ์ ข้อคำถาม และหนังสือเวียนคณะ/หนังสือตอบข้อหารือ ตำแหน่งทางวิชาการ มหาวิทยาลัยศิลปากร",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
